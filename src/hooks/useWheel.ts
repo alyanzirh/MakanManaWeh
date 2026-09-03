@@ -4,20 +4,16 @@ import { componentTokens } from '../theme/theme';
 import { RestaurantSearchError, searchRestaurants } from '../services/restaurantSearch';
 import { useLocation } from './useLocation';
 
-const DEFAULT_FILTERS: Filters = {
-  radiusKm: 5,
-  wheelSize: 'some',
-  cuisine: 'any',
-};
-
 export interface ReelNeighbors {
   before: Restaurant;
   after: Restaurant;
 }
 
-export function useWheel() {
+// Mounting this hook is what triggers useLocation's permission prompt (it
+// requests on mount and can't be changed) — callers should only mount this
+// once the user has taken an action that justifies asking for location.
+export function useWheel(filters: Filters) {
   const location = useLocation();
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -26,14 +22,9 @@ export function useWheel() {
   const [reelItems, setReelItems] = useState<Restaurant[]>([]);
   const [resultNeighbors, setResultNeighbors] = useState<ReelNeighbors | null>(null);
 
-  const setCuisine = useCallback((id: CuisineId) => {
-    setFilters((prev) => ({ ...prev, cuisine: id }));
-  }, []);
-
   const loadRestaurants = useCallback(async () => {
     if (!location.coords) {
       setSearchError('Waiting for your location…');
-      location.requestLocation();
       return;
     }
     setIsLoading(true);
@@ -59,8 +50,6 @@ export function useWheel() {
     } finally {
       setIsLoading(false);
     }
-    // location.requestLocation is stable via useCallback with no deps; filters is intentionally
-    // the trigger here rather than location.coords, which only changes once per permission grant.
   }, [location.coords, filters]);
 
   const landOnReel = useCallback(() => {
@@ -92,9 +81,6 @@ export function useWheel() {
   }, []);
 
   return {
-    filters,
-    setFilters,
-    setCuisine,
     restaurants,
     isLoading,
     errorMessage: searchError ?? location.errorMessage,
@@ -106,6 +92,5 @@ export function useWheel() {
     landOnReel,
     reset,
     locationStatus: location.status,
-    requestLocation: location.requestLocation,
   };
 }

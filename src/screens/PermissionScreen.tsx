@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Mascot } from '../components/Mascot';
 import { colors } from '../theme/theme';
 
 interface Props {
@@ -7,25 +8,27 @@ interface Props {
   onSkip: () => void;
 }
 
-// Placeholder visuals — real mascot/copy land in the screen-by-screen build step.
 export function PermissionScreen({ onAllow, onSkip }: Props) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Permission</Text>
-      <Pressable style={styles.button} onPress={onAllow}>
-        <Text style={styles.buttonText}>Allow location</Text>
+      <Mascot variant="permission" size={140} />
+      <Text style={styles.title}>let's find you somewhere to eat</Text>
+      <Text style={styles.body}>we'll find restaurants near you once you share your location.</Text>
+      <Pressable style={styles.allowButton} onPress={onAllow}>
+        <Text style={styles.allowText}>allow location</Text>
       </Pressable>
-      <Pressable onPress={onSkip}>
-        <Text style={styles.skipText}>Maybe later</Text>
+      <Pressable onPress={onSkip} hitSlop={8}>
+        <Text style={styles.skipText}>maybe later</Text>
       </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cream, gap: 16 },
-  title: { fontSize: 20, fontWeight: '700', color: colors.ink },
-  button: { backgroundColor: colors.primary, borderRadius: 99, paddingVertical: 13, paddingHorizontal: 32 },
-  buttonText: { color: colors.white, fontWeight: '700' },
-  skipText: { color: colors.textMuted, fontWeight: '700' },
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cream, padding: 24 },
+  title: { fontFamily: 'Fredoka_700Bold', fontSize: 18, color: colors.ink, marginBottom: 8, textAlign: 'center' },
+  body: { fontFamily: 'Quicksand_500Medium', fontSize: 12, color: colors.bodyTextOnCream, maxWidth: 190, textAlign: 'center', marginBottom: 24 },
+  allowButton: { backgroundColor: colors.primary, borderRadius: 99, paddingVertical: 13, paddingHorizontal: 32, marginBottom: 10 },
+  allowText: { fontFamily: 'Quicksand_700Bold', color: colors.white, fontSize: 14 },
+  skipText: { fontFamily: 'Quicksand_700Bold', color: colors.textMuted, fontSize: 12 },
 });

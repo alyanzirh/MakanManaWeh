@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Linking, SafeAreaView, StatusBar, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Linking, SafeAreaView, StatusBar, StyleSheet, View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts, Fredoka_600SemiBold, Fredoka_700Bold } from '@expo-google-fonts/fredoka';
 import { Quicksand_500Medium, Quicksand_600SemiBold, Quicksand_700Bold } from '@expo-google-fonts/quicksand';
@@ -12,80 +12,88 @@ import {
   ResultScreen,
   EmptyScreen,
 } from './src/screens';
+import { useFilters } from './src/hooks/useFilters';
 import { useWheel } from './src/hooks/useWheel';
+import { CuisineId, Filters } from './src/types';
 import { colors } from './src/theme/theme';
 
 SplashScreen.preventAutoHideAsync();
 
-type MainScreen = 'permission' | 'setup' | 'loading' | 'spin' | 'result' | 'empty';
+type ActiveScreen = 'permission-pending' | 'setup' | 'loading' | 'spin' | 'result' | 'empty';
 
-// Owns useWheel() (and therefore useLocation(), whose permission prompt
-// fires on mount) — this only mounts once the user has moved past
-// Onboarding, so the OS location dialog appears near the Permission
-// screen's rationale copy rather than during Onboarding's auto-advance.
-function MainFlow() {
-  const {
-    filters,
-    setFilters,
-    setCuisine,
-    restaurants,
-    isLoading,
-    winner,
-    isSpinning,
-    reelItems,
-    resultNeighbors,
-    loadRestaurants,
-    landOnReel,
-    reset,
-    requestLocation,
-  } = useWheel();
+interface SearchFlowProps {
+  filters: Filters;
+  setFilters: React.Dispatch<React.SetStateAction<Filters>>;
+  setCuisine: (id: CuisineId) => void;
+  initialScreen: ActiveScreen;
+}
 
-  const [screen, setScreen] = useState<MainScreen>('permission');
+// Only mounted once the user has taken an action that justifies asking for
+// location (tapping "allow location", or "find restaurants" having skipped
+// permission) — mounting useWheel() is what triggers the OS location prompt,
+// so this component's own mount timing IS the tap-gate.
+function SearchFlow({ filters, setFilters, setCuisine, initialScreen }: SearchFlowProps) {
+  const wheel = useWheel(filters);
+  const [screen, setScreen] = useState<ActiveScreen>(initialScreen);
+  const searchAttemptedRef = useRef(false);
 
-  const goToSetup = useCallback(() => setScreen('setup'), []);
-
-  const handleAllow = useCallback(() => {
-    requestLocation();
-    goToSetup();
-  }, [requestLocation, goToSetup]);
-
-  const handleSubmit = useCallback(() => {
-    setScreen('loading');
-    loadRestaurants();
-  }, [loadRestaurants]);
-
-  // Once a search finishes with zero results, skip straight to Empty —
-  // never let the user reach Spin having watched the wheel for nothing.
+  // "allow location" lands here first — stay put until the OS dialog has
+  // actually been answered (granted, denied, or errored), so the user never
+  // sees Setup appear underneath/before the permission prompt resolves.
   useEffect(() => {
-    if (screen === 'loading' && !isLoading && restaurants.length === 0) {
+    if (screen !== 'permission-pending') return;
+    if (wheel.locationStatus === 'idle' || wheel.locationStatus === 'requesting') return;
+    setScreen('setup');
+  }, [screen, wheel.locationStatus]);
+
+  // Drives the Loading screen: waits for location to resolve, fires the
+  // search once, and routes to Empty on denial/error or a genuine
+  // zero-result outcome (never lets the user reach Spin with nothing).
+  useEffect(() => {
+    if (screen !== 'loading') return;
+
+    if (wheel.locationStatus === 'denied' || wheel.locationStatus === 'error') {
       setScreen('empty');
+      return;
     }
-  }, [screen, isLoading, restaurants.length]);
+
+    if (wheel.locationStatus === 'granted' && wheel.restaurants.length === 0 && !wheel.isLoading) {
+      if (!searchAttemptedRef.current) {
+        searchAttemptedRef.current = true;
+        wheel.loadRestaurants();
+      } else {
+        setScreen('empty');
+      }
+    }
+  }, [screen, wheel.locationStatus, wheel.restaurants.length, wheel.isLoading, wheel.loadRestaurants]);
+
+  const handleSetupSubmit = useCallback(() => {
+    searchAttemptedRef.current = false;
+    setScreen('loading');
+  }, []);
 
   const handleSpinNow = useCallback(() => {
-    reset();
-    landOnReel();
+    wheel.reset();
+    wheel.landOnReel();
     setScreen('spin');
-  }, [reset, landOnReel]);
+  }, [wheel]);
 
-  // landOnReel() precomputes the winner up front and reveals it after a
-  // fixed delay (see useWheel) — once it lands, move to Result.
   useEffect(() => {
-    if (screen === 'spin' && !isSpinning && winner) {
+    if (screen === 'spin' && !wheel.isSpinning && wheel.winner) {
       setScreen('result');
     }
-  }, [screen, isSpinning, winner]);
+  }, [screen, wheel.isSpinning, wheel.winner]);
 
   const handleSpinAgain = useCallback(() => {
-    if (restaurants.length > 0) {
-      reset();
-      landOnReel();
+    if (wheel.restaurants.length > 0) {
+      wheel.reset();
+      wheel.landOnReel();
       setScreen('spin');
     } else {
+      searchAttemptedRef.current = false;
       setScreen('loading');
-      loadRestaurants();
     }
-  }, [restaurants.length, reset, landOnReel, loadRestaurants]);
+  }, [wheel]);
 
   const handleWidenRadius = useCallback(() => {
     setFilters((prev) => ({ ...prev, radiusKm: prev.radiusKm + 3 }));
@@ -98,36 +106,82 @@ function MainFlow() {
   }, [setCuisine]);
 
   const handleOpenMaps = useCallback(() => {
-    if (!winner) return;
-    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(winner.name)}`;
+    if (!wheel.winner) return;
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(wheel.winner.name)}`;
     Linking.openURL(url);
-  }, [winner]);
+  }, [wheel.winner]);
 
   switch (screen) {
-    case 'permission':
-      return <PermissionScreen onAllow={handleAllow} onSkip={goToSetup} />;
+    case 'permission-pending':
+      return (
+        <View style={styles.pendingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      );
     case 'setup':
-      return <SetupScreen filters={filters} onChangeFilters={setFilters} onSubmit={handleSubmit} />;
+      return <SetupScreen filters={filters} onChangeFilters={setFilters} onSubmit={handleSetupSubmit} />;
     case 'loading':
       return (
         <LoadingScreen
           radiusKm={filters.radiusKm}
-          isReady={!isLoading && restaurants.length > 0}
-          foundCount={restaurants.length}
+          isReady={!wheel.isLoading && wheel.restaurants.length > 0}
+          foundCount={wheel.restaurants.length}
           onSpinNow={handleSpinNow}
         />
       );
     case 'spin':
-      return <SpinScreen reelItems={reelItems} onSpinComplete={() => setScreen('result')} />;
+      return <SpinScreen reelItems={wheel.reelItems} onSpinComplete={() => setScreen('result')} />;
     case 'result':
-      return winner && resultNeighbors ? (
-        <ResultScreen winner={winner} neighbors={resultNeighbors} onOpenMaps={handleOpenMaps} onSpinAgain={handleSpinAgain} />
+      return wheel.winner && wheel.resultNeighbors ? (
+        <ResultScreen
+          winner={wheel.winner}
+          neighbors={wheel.resultNeighbors}
+          onOpenMaps={handleOpenMaps}
+          onSpinAgain={handleSpinAgain}
+        />
       ) : null;
     case 'empty':
       return <EmptyScreen radiusKm={filters.radiusKm} onWidenRadius={handleWidenRadius} onChangeCuisine={handleChangeCuisine} />;
     default:
       return null;
   }
+}
+
+// Owns filters (safe to use before useWheel exists) and decides when it's
+// time to mount SearchFlow — either "allow location" was tapped, or "find
+// restaurants" was tapped having skipped permission. Either way, the OS
+// location prompt only fires once SearchFlow (and therefore useWheel/
+// useLocation) actually mounts, not before.
+function MainFlow() {
+  const { filters, setFilters, setCuisine } = useFilters();
+  const [wheelActive, setWheelActive] = useState(false);
+  const [preActiveScreen, setPreActiveScreen] = useState<'permission' | 'setup'>('permission');
+  const [initialActiveScreen, setInitialActiveScreen] = useState<ActiveScreen>('setup');
+
+  const handleAllow = useCallback(() => {
+    setInitialActiveScreen('permission-pending');
+    setWheelActive(true);
+  }, []);
+
+  const handleSkipPermission = useCallback(() => {
+    setPreActiveScreen('setup');
+  }, []);
+
+  const handlePreActiveSetupSubmit = useCallback(() => {
+    setInitialActiveScreen('loading');
+    setWheelActive(true);
+  }, []);
+
+  if (!wheelActive) {
+    if (preActiveScreen === 'permission') {
+      return <PermissionScreen onAllow={handleAllow} onSkip={handleSkipPermission} />;
+    }
+    return <SetupScreen filters={filters} onChangeFilters={setFilters} onSubmit={handlePreActiveSetupSubmit} />;
+  }
+
+  return (
+    <SearchFlow filters={filters} setFilters={setFilters} setCuisine={setCuisine} initialScreen={initialActiveScreen} />
+  );
 }
 
 export default function App() {
@@ -160,4 +214,5 @@ export default function App() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
+  pendingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cream },
 });
