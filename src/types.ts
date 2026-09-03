@@ -1,20 +1,10 @@
-export type CuisineId =
-  | 'any'
-  | 'western'
-  | 'seafood'
-  | 'cafe'
-  | 'japanese'
-  | 'chinese'
-  | 'italian'
-  | 'indian'
-  | 'malay'
-  | 'fastFood'
-  | 'dessert';
+export type CuisineId = 'malay' | 'chinese' | 'indian' | 'any';
+
+export type WheelSize = 'few' | 'some' | 'lots';
 
 export interface CuisineOption {
   id: CuisineId;
   label: string;
-  icon: string;
 }
 
 export interface Restaurant {
@@ -29,6 +19,6 @@ export interface Restaurant {
 
 export interface Filters {
   radiusKm: number;
-  maxRestaurants: number;
-  cuisines: CuisineId[];
+  wheelSize: WheelSize;
+  cuisine: CuisineId;
 }

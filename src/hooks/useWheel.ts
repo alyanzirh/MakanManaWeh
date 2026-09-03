@@ -1,14 +1,19 @@
-import { useCallback, useRef, useState } from 'react';
-import { Animated, Easing } from 'react-native';
+import { useCallback, useState } from 'react';
 import { CuisineId, Filters, Restaurant } from '../types';
+import { componentTokens } from '../theme/theme';
 import { RestaurantSearchError, searchRestaurants } from '../services/restaurantSearch';
 import { useLocation } from './useLocation';
 
 const DEFAULT_FILTERS: Filters = {
-  radiusKm: 2,
-  maxRestaurants: 8,
-  cuisines: ['any'],
+  radiusKm: 5,
+  wheelSize: 'some',
+  cuisine: 'any',
 };
+
+export interface ReelNeighbors {
+  before: Restaurant;
+  after: Restaurant;
+}
 
 export function useWheel() {
   const location = useLocation();
@@ -18,17 +23,11 @@ export function useWheel() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [winner, setWinner] = useState<Restaurant | null>(null);
   const [isSpinning, setIsSpinning] = useState(false);
+  const [reelItems, setReelItems] = useState<Restaurant[]>([]);
+  const [resultNeighbors, setResultNeighbors] = useState<ReelNeighbors | null>(null);
 
-  const rotation = useRef(new Animated.Value(0)).current;
-  const rotationValueRef = useRef(0);
-
-  const toggleCuisine = useCallback((id: CuisineId) => {
-    setFilters((prev) => {
-      if (id === 'any') return { ...prev, cuisines: ['any'] };
-      const withoutAny = prev.cuisines.filter((c) => c !== 'any');
-      const next = withoutAny.includes(id) ? withoutAny.filter((c) => c !== id) : [...withoutAny, id];
-      return { ...prev, cuisines: next.length === 0 ? ['any'] : next };
-    });
+  const setCuisine = useCallback((id: CuisineId) => {
+    setFilters((prev) => ({ ...prev, cuisine: id }));
   }, []);
 
   const loadRestaurants = useCallback(async () => {
@@ -40,13 +39,14 @@ export function useWheel() {
     setIsLoading(true);
     setSearchError(null);
     setWinner(null);
+    setResultNeighbors(null);
     try {
       const results = await searchRestaurants({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
         radiusKm: filters.radiusKm,
-        cuisines: filters.cuisines,
-        maxResults: filters.maxRestaurants,
+        cuisines: filters.cuisine === 'any' ? (['any'] as CuisineId[]) : [filters.cuisine],
+        maxResults: componentTokens.sizeCaps[filters.wheelSize],
       });
       setRestaurants(results);
     } catch (error) {
@@ -63,46 +63,49 @@ export function useWheel() {
     // the trigger here rather than location.coords, which only changes once per permission grant.
   }, [location.coords, filters]);
 
-  const spin = useCallback(() => {
-    if (restaurants.length === 0 || isSpinning) return;
-    setIsSpinning(true);
+  const landOnReel = useCallback(() => {
+    const items = restaurants;
+    const n = items.length;
+    if (n === 0) return;
+
+    const targetIndex = Math.floor(Math.random() * n);
+    const neighbors: ReelNeighbors = {
+      before: items[(targetIndex - 1 + n) % n],
+      after: items[(targetIndex + 1) % n],
+    };
+
+    setReelItems(items);
     setWinner(null);
+    setResultNeighbors(null);
+    setIsSpinning(true);
 
-    const sliceAngle = 360 / restaurants.length;
-    const winningIndex = Math.floor(Math.random() * restaurants.length);
-    const targetAngle = sliceAngle * winningIndex + sliceAngle / 2;
-    const extraSpins = (5 + Math.floor(Math.random() * 4)) * 360;
-    const currentNormalized = rotationValueRef.current % 360;
-    const delta = extraSpins + (360 - targetAngle) - currentNormalized;
-    const nextValue = rotationValueRef.current + delta;
-
-    Animated.timing(rotation, {
-      toValue: nextValue,
-      duration: 4500,
-      easing: Easing.bezier(0.15, 0.85, 0.3, 1),
-      useNativeDriver: true,
-    }).start(() => {
-      rotationValueRef.current = nextValue;
-      setWinner(restaurants[winningIndex]);
+    setTimeout(() => {
+      setWinner(items[targetIndex]);
+      setResultNeighbors(neighbors);
       setIsSpinning(false);
-    });
-  }, [restaurants, isSpinning, rotation]);
+    }, 3000);
+  }, [restaurants]);
 
-  const reset = useCallback(() => setWinner(null), []);
+  const reset = useCallback(() => {
+    setWinner(null);
+    setResultNeighbors(null);
+  }, []);
 
   return {
     filters,
     setFilters,
-    toggleCuisine,
+    setCuisine,
     restaurants,
     isLoading,
     errorMessage: searchError ?? location.errorMessage,
     winner,
     isSpinning,
-    rotation,
+    reelItems,
+    resultNeighbors,
     loadRestaurants,
-    spin,
+    landOnReel,
     reset,
     locationStatus: location.status,
+    requestLocation: location.requestLocation,
   };
 }

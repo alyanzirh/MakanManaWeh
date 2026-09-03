@@ -35,9 +35,6 @@ function buildQuery({ latitude, longitude, radiusKm, cuisines }: SearchParams): 
   const cuisineList = cuisines.length === 0 || cuisines.includes('any') ? (['any'] as CuisineId[]) : cuisines;
 
   const clauses = cuisineList.map((cuisine) => {
-    if (cuisine === 'cafe') return `node["amenity"="cafe"]${around};`;
-    if (cuisine === 'fastFood') return `node["amenity"="fast_food"]${around};`;
-
     const pattern = CUISINE_OSM_PATTERN[cuisine];
     if (!pattern) {
       // 'any', or a cuisine without a clean OSM tag: match any restaurant/cafe/fast food.
