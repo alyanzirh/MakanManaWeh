@@ -1,5 +1,5 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { Mascot } from '../components/Mascot';
 import { colors } from '../theme/theme';
 
@@ -7,49 +7,48 @@ interface Props {
   onDone: () => void;
 }
 
-// Placeholder visuals — real mascot/progress-bar/timing land in the
-// screen-by-screen build step. This wires the real onDone transition.
-// TEMP: previewing all 5 Mascot variants here for visual review — removed
-// once Onboarding's real layout (single default-variant mascot) is built.
+// Auto-advances after ~2.3s — no button, per the design spec.
 export function OnboardingScreen({ onDone }: Props) {
+  const fillPercent = useRef(new Animated.Value(8)).current;
+
+  useEffect(() => {
+    const startFill = setTimeout(() => {
+      Animated.timing(fillPercent, {
+        toValue: 100,
+        duration: 2100,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }).start();
+    }, 100);
+    const advance = setTimeout(onDone, 2300);
+
+    return () => {
+      clearTimeout(startFill);
+      clearTimeout(advance);
+    };
+  }, [onDone, fillPercent]);
+
+  const fillWidth = fillPercent.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%'],
+  });
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Onboarding</Text>
-      <View style={styles.mascotRow}>
-        <View style={styles.mascotCell}>
-          <Mascot variant="default" size={70} />
-          <Text style={styles.mascotLabel}>default</Text>
-        </View>
-        <View style={styles.mascotCell}>
-          <Mascot variant="permission" size={70} />
-          <Text style={styles.mascotLabel}>permission</Text>
-        </View>
-        <View style={styles.mascotCell}>
-          <Mascot variant="loading" size={70} />
-          <Text style={styles.mascotLabel}>loading</Text>
-        </View>
-        <View style={styles.mascotCell}>
-          <Mascot variant="empty" size={70} />
-          <Text style={styles.mascotLabel}>empty</Text>
-        </View>
-        <View style={styles.mascotCell}>
-          <Mascot variant="setupIcon" size={70} />
-          <Text style={styles.mascotLabel}>setupIcon</Text>
-        </View>
+      <Mascot variant="default" size={140} />
+      <Text style={styles.wordmark}>makan mana weh?</Text>
+      <Text style={styles.tagline}>let's find out together!</Text>
+      <View style={styles.progressTrack}>
+        <Animated.View style={[styles.progressFill, { width: fillWidth }]} />
       </View>
-      <Pressable style={styles.button} onPress={onDone}>
-        <Text style={styles.buttonText}>Continue</Text>
-      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cream, gap: 16 },
-  title: { fontSize: 20, fontWeight: '700', color: colors.ink },
-  mascotRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 },
-  mascotCell: { alignItems: 'center', gap: 4 },
-  mascotLabel: { fontSize: 10, color: colors.textMuted },
-  button: { backgroundColor: colors.primary, borderRadius: 99, paddingVertical: 13, paddingHorizontal: 32 },
-  buttonText: { color: colors.white, fontWeight: '700' },
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cream, padding: 24 },
+  wordmark: { fontFamily: 'Fredoka_700Bold', fontSize: 28, color: colors.primary },
+  tagline: { fontFamily: 'Quicksand_500Medium', fontSize: 12, color: colors.bodyTextOnCream, marginTop: 12, marginBottom: 26 },
+  progressTrack: { width: 64, height: 5, borderRadius: 99, backgroundColor: colors.sand, overflow: 'hidden' },
+  progressFill: { height: 5, borderRadius: 99, backgroundColor: colors.accent },
 });
