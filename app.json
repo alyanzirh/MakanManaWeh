@@ -2,6 +2,13 @@
   "expo": {
     "name": "MakanManaWeh",
     "slug": "MakanManaWeh",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.yourname.makanmanaweh",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We use your location to find restaurants near you."
+      }
+    },
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,9 +18,6 @@
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
-    },
-    "ios": {
-      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
