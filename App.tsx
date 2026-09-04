@@ -14,6 +14,7 @@ import {
   ResultScreen,
   EmptyScreen,
 } from './src/screens';
+import { FadeIn } from './src/components/FadeIn';
 import { useFilters } from './src/hooks/useFilters';
 import { useWheel } from './src/hooks/useWheel';
 import { CuisineId, Filters } from './src/types';
@@ -137,17 +138,20 @@ function SearchFlow({ filters, setFilters, setCuisine, initialScreen }: SearchFl
     setScreen('loading');
   }, [wheel]);
 
+  let content: React.ReactNode;
   switch (screen) {
     case 'permission-pending':
-      return (
+      content = (
         <View style={styles.pendingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       );
+      break;
     case 'setup':
-      return <SetupScreen filters={filters} onChangeFilters={setFilters} onSubmit={handleSetupSubmit} />;
+      content = <SetupScreen filters={filters} onChangeFilters={setFilters} onSubmit={handleSetupSubmit} />;
+      break;
     case 'loading':
-      return (
+      content = (
         <LoadingScreen
           radiusKm={filters.radiusKm}
           isReady={!wheel.isLoading && wheel.restaurants.length > 0}
@@ -155,32 +159,42 @@ function SearchFlow({ filters, setFilters, setCuisine, initialScreen }: SearchFl
           onSpinNow={handleSpinNow}
         />
       );
+      break;
     case 'spin':
-      return (
+      content = (
         <SpinScreen
           reelItems={wheel.reelItems}
           segmentCount={componentTokens.wheel.segmentCount}
           onSpinComplete={() => setScreen('result')}
         />
       );
+      break;
     case 'result':
-      return wheel.winner && wheel.resultNeighbors ? (
-        <ResultScreen
-          winner={wheel.winner}
-          neighbors={wheel.resultNeighbors}
-          segmentCount={componentTokens.wheel.segmentCount}
-          onOpenMaps={handleOpenMaps}
-          onSpinAgain={handleSpinAgain}
-          onChangePreferences={handleChangePreferences}
-        />
-      ) : null;
+      content =
+        wheel.winner && wheel.resultNeighbors ? (
+          <ResultScreen
+            winner={wheel.winner}
+            neighbors={wheel.resultNeighbors}
+            segmentCount={componentTokens.wheel.segmentCount}
+            onOpenMaps={handleOpenMaps}
+            onSpinAgain={handleSpinAgain}
+            onChangePreferences={handleChangePreferences}
+          />
+        ) : null;
+      break;
     case 'empty':
-      return <EmptyScreen radiusKm={filters.radiusKm} onWidenRadius={handleWidenRadius} onChangeCuisine={handleChangeCuisine} />;
+      content = (
+        <EmptyScreen radiusKm={filters.radiusKm} onWidenRadius={handleWidenRadius} onChangeCuisine={handleChangeCuisine} />
+      );
+      break;
     case 'permission-denied':
-      return <PermissionDeniedScreen onTryAgain={handleTryLocationAgain} />;
+      content = <PermissionDeniedScreen onTryAgain={handleTryLocationAgain} />;
+      break;
     default:
-      return null;
+      content = null;
   }
+
+  return <FadeIn key={screen}>{content}</FadeIn>;
 }
 
 // Owns filters (safe to use before useWheel exists) and decides when it's
@@ -233,21 +247,25 @@ function MainFlow() {
   }, []);
 
   if (!wheelActive) {
+    let content: React.ReactNode;
     if (preActiveScreen === 'checking') {
-      return (
+      content = (
         <View style={styles.pendingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       );
+    } else if (preActiveScreen === 'permission') {
+      content = <PermissionScreen onAllow={handleAllow} onSkip={handleSkipPermission} />;
+    } else {
+      content = <SetupScreen filters={filters} onChangeFilters={setFilters} onSubmit={handlePreActiveSetupSubmit} />;
     }
-    if (preActiveScreen === 'permission') {
-      return <PermissionScreen onAllow={handleAllow} onSkip={handleSkipPermission} />;
-    }
-    return <SetupScreen filters={filters} onChangeFilters={setFilters} onSubmit={handlePreActiveSetupSubmit} />;
+    return <FadeIn key={preActiveScreen}>{content}</FadeIn>;
   }
 
   return (
-    <SearchFlow filters={filters} setFilters={setFilters} setCuisine={setCuisine} initialScreen={initialActiveScreen} />
+    <FadeIn key="active">
+      <SearchFlow filters={filters} setFilters={setFilters} setCuisine={setCuisine} initialScreen={initialActiveScreen} />
+    </FadeIn>
   );
 }
 
@@ -274,7 +292,9 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      {pastOnboarding ? <MainFlow /> : <OnboardingScreen onDone={() => setPastOnboarding(true)} />}
+      <FadeIn key={pastOnboarding ? 'main' : 'onboarding'}>
+        {pastOnboarding ? <MainFlow /> : <OnboardingScreen onDone={() => setPastOnboarding(true)} />}
+      </FadeIn>
     </SafeAreaView>
   );
 }
