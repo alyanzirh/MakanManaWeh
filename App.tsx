@@ -7,6 +7,7 @@ import { Quicksand_500Medium, Quicksand_600SemiBold, Quicksand_700Bold } from '@
 import {
   OnboardingScreen,
   PermissionScreen,
+  PermissionDeniedScreen,
   SetupScreen,
   LoadingScreen,
   SpinScreen,
@@ -20,7 +21,7 @@ import { colors, componentTokens } from './src/theme/theme';
 
 SplashScreen.preventAutoHideAsync();
 
-type ActiveScreen = 'permission-pending' | 'setup' | 'loading' | 'spin' | 'result' | 'empty';
+type ActiveScreen = 'permission-pending' | 'setup' | 'loading' | 'spin' | 'result' | 'empty' | 'permission-denied';
 
 interface SearchFlowProps {
   filters: Filters;
@@ -56,7 +57,7 @@ function SearchFlow({ filters, setFilters, setCuisine, initialScreen }: SearchFl
     if (screen !== 'loading') return;
 
     if (wheel.locationStatus === 'denied' || wheel.locationStatus === 'error') {
-      setScreen('empty');
+      setScreen('permission-denied');
       return;
     }
     if (wheel.locationStatus !== 'granted') return;
@@ -126,6 +127,16 @@ function SearchFlow({ filters, setFilters, setCuisine, initialScreen }: SearchFl
     setScreen('setup');
   }, []);
 
+  // "try again" on the permission-denied screen — re-requests (harmless/
+  // idempotent if still denied; picks up an external Settings change if
+  // the user just came back from there) and lets the loading effect above
+  // route onward once locationStatus resolves, same as the first attempt.
+  const handleTryLocationAgain = useCallback(() => {
+    searchAttemptedRef.current = false;
+    wheel.requestLocation();
+    setScreen('loading');
+  }, [wheel]);
+
   switch (screen) {
     case 'permission-pending':
       return (
@@ -165,6 +176,8 @@ function SearchFlow({ filters, setFilters, setCuisine, initialScreen }: SearchFl
       ) : null;
     case 'empty':
       return <EmptyScreen radiusKm={filters.radiusKm} onWidenRadius={handleWidenRadius} onChangeCuisine={handleChangeCuisine} />;
+    case 'permission-denied':
+      return <PermissionDeniedScreen onTryAgain={handleTryLocationAgain} />;
     default:
       return null;
   }

@@ -108,5 +108,6 @@ export function useWheel(filters: Filters) {
     reset,
     clearResults,
     locationStatus: location.status,
+    requestLocation: location.requestLocation,
   };
 }
