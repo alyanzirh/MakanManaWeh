@@ -16,7 +16,7 @@ import {
 import { useFilters } from './src/hooks/useFilters';
 import { useWheel } from './src/hooks/useWheel';
 import { CuisineId, Filters } from './src/types';
-import { colors } from './src/theme/theme';
+import { colors, componentTokens } from './src/theme/theme';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -48,8 +48,10 @@ function SearchFlow({ filters, setFilters, setCuisine, initialScreen }: SearchFl
   }, [screen, wheel.locationStatus]);
 
   // Drives the Loading screen: waits for location to resolve, fires the
-  // search once, and routes to Empty on denial/error or a genuine
-  // zero-result outcome (never lets the user reach Spin with nothing).
+  // search once per visit here (searchAttemptedRef, not restaurants.length
+  // — a resubmit after "change preferences" still has the OLD results
+  // cached, so gating on an empty list would skip re-searching entirely),
+  // and routes to Empty on denial/error or a genuine zero-result outcome.
   useEffect(() => {
     if (screen !== 'loading') return;
 
@@ -57,21 +59,26 @@ function SearchFlow({ filters, setFilters, setCuisine, initialScreen }: SearchFl
       setScreen('empty');
       return;
     }
+    if (wheel.locationStatus !== 'granted') return;
 
-    if (wheel.locationStatus === 'granted' && wheel.restaurants.length === 0 && !wheel.isLoading) {
-      if (!searchAttemptedRef.current) {
+    if (!searchAttemptedRef.current) {
+      if (!wheel.isLoading) {
         searchAttemptedRef.current = true;
         wheel.loadRestaurants();
-      } else {
-        setScreen('empty');
       }
+      return;
+    }
+
+    if (!wheel.isLoading && wheel.restaurants.length === 0) {
+      setScreen('empty');
     }
   }, [screen, wheel.locationStatus, wheel.restaurants.length, wheel.isLoading, wheel.loadRestaurants]);
 
   const handleSetupSubmit = useCallback(() => {
     searchAttemptedRef.current = false;
+    wheel.clearResults();
     setScreen('loading');
-  }, []);
+  }, [wheel]);
 
   const handleSpinNow = useCallback(() => {
     wheel.reset();
@@ -112,6 +119,13 @@ function SearchFlow({ filters, setFilters, setCuisine, initialScreen }: SearchFl
     Linking.openURL(url);
   }, [wheel.winner]);
 
+  // From Result only — Spin is a deliberate, brief, uninterruptible payoff
+  // moment, so there's no way back mid-spin. Filters are left as-is (not
+  // reset) since the user isn't wrong, just wants to adjust.
+  const handleChangePreferences = useCallback(() => {
+    setScreen('setup');
+  }, []);
+
   switch (screen) {
     case 'permission-pending':
       return (
@@ -131,14 +145,22 @@ function SearchFlow({ filters, setFilters, setCuisine, initialScreen }: SearchFl
         />
       );
     case 'spin':
-      return <SpinScreen reelItems={wheel.reelItems} onSpinComplete={() => setScreen('result')} />;
+      return (
+        <SpinScreen
+          reelItems={wheel.reelItems}
+          segmentCount={componentTokens.wheel.segmentCount}
+          onSpinComplete={() => setScreen('result')}
+        />
+      );
     case 'result':
       return wheel.winner && wheel.resultNeighbors ? (
         <ResultScreen
           winner={wheel.winner}
           neighbors={wheel.resultNeighbors}
+          segmentCount={componentTokens.wheel.segmentCount}
           onOpenMaps={handleOpenMaps}
           onSpinAgain={handleSpinAgain}
+          onChangePreferences={handleChangePreferences}
         />
       ) : null;
     case 'empty':

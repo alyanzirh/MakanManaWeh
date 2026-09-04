@@ -7,7 +7,12 @@ import { ReelNeighbors } from '../hooks/useWheel';
 import { colors, componentTokens, shadow } from '../theme/theme';
 
 const ROW_HEIGHT = componentTokens.reelRow.height;
-const REEL_HEIGHT = ROW_HEIGHT * 3;
+// 5 visible rows (2 dimmed above/below the highlight) rather than the
+// design's original 3 — a fuller "slot machine" feel, and makes better use
+// of the larger item pools now that wheelSize caps were raised (see theme).
+const VISIBLE_ROWS = 5;
+const REEL_HEIGHT = ROW_HEIGHT * VISIBLE_ROWS;
+const CENTER_ROW_INDEX = Math.floor(VISIBLE_ROWS / 2);
 // A transparent version of `cream` itself (not the 'transparent' keyword,
 // which is transparent BLACK) — fading toward black-at-zero-alpha still
 // blends the RGB channels toward black as it interpolates, producing a
@@ -117,9 +122,11 @@ export function Reel(props: Props) {
         </View>
       </View>
       <View style={styles.neighborStack}>
-        <Row restaurant={neighbors.before} nameStyle={styles.scrollingName} dimmed />
+        <Row restaurant={neighbors.before[0]} nameStyle={styles.scrollingName} dimmed />
+        <Row restaurant={neighbors.before[1]} nameStyle={styles.scrollingName} dimmed />
         <View style={{ height: ROW_HEIGHT }} />
-        <Row restaurant={neighbors.after} nameStyle={styles.scrollingName} dimmed />
+        <Row restaurant={neighbors.after[0]} nameStyle={styles.scrollingName} dimmed />
+        <Row restaurant={neighbors.after[1]} nameStyle={styles.scrollingName} dimmed />
       </View>
       <LinearGradient
         colors={[colors.cream, TRANSPARENT_CREAM]}
@@ -140,7 +147,7 @@ const styles = StyleSheet.create({
   landedContainer: { marginBottom: 22 },
   highlightWindow: {
     position: 'absolute',
-    top: ROW_HEIGHT,
+    top: ROW_HEIGHT * CENTER_ROW_INDEX,
     left: 0,
     right: 0,
     height: ROW_HEIGHT,

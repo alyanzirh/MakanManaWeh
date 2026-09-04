@@ -1,29 +1,33 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { DecorativeWheel } from '../components/DecorativeWheel';
+import { Reel } from '../components/Reel';
 import { Restaurant } from '../types';
-import { colors } from '../theme/theme';
+import { colors, componentTokens } from '../theme/theme';
 
 interface Props {
   reelItems: Restaurant[];
+  segmentCount: 4 | 6 | 8;
   onSpinComplete: () => void;
 }
 
-// Placeholder visuals — real decorative wheel + scrolling reel land in the
-// screen-by-screen build step. The actual 3000ms precompute-then-reveal
-// timing lives in useWheel.landOnReel; MainFlow calls onSpinComplete once
-// useWheel reports a winner, so this screen doesn't own its own timer.
-export function SpinScreen({ reelItems }: Props) {
+// The decorative wheel's motion has no relation to the eventual winner —
+// useWheel.landOnReel() already precomputed it before this screen even
+// mounts, and reveals it after a fixed delay; MainFlow watches for that
+// (via `winner`) and transitions away, so onSpinComplete is unused here.
+export function SpinScreen({ reelItems, segmentCount }: Props) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>And the wheel says…</Text>
-      <Text style={styles.subtitle}>Settling on your restaurant</Text>
-      <Text style={styles.subtitle}>{reelItems.length} restaurants in the mix</Text>
+      <DecorativeWheel segmentCount={segmentCount} spinning size={componentTokens.wheel.diameterCompact} />
+      <Text style={styles.heading}>and the wheel says...</Text>
+      <Text style={styles.subcopy}>settling on your restaurant</Text>
+      <Reel mode="scrolling" items={reelItems} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cream, gap: 8, padding: 24 },
-  title: { fontSize: 16, fontWeight: '700', color: colors.ink },
-  subtitle: { fontSize: 11, color: colors.textMuted },
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cream, padding: 24 },
+  heading: { fontFamily: 'Fredoka_700Bold', fontSize: 16, color: colors.ink, marginTop: 14, marginBottom: 4 },
+  subcopy: { fontFamily: 'Quicksand_500Medium', fontSize: 11, color: colors.textMuted, marginBottom: 18 },
 });

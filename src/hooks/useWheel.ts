@@ -5,8 +5,11 @@ import { RestaurantSearchError, searchRestaurants } from '../services/restaurant
 import { useLocation } from './useLocation';
 
 export interface ReelNeighbors {
-  before: Restaurant;
-  after: Restaurant;
+  // Display order top-to-bottom: before[0] is furthest above the winner,
+  // before[1] sits directly above it; after[0] sits directly below,
+  // after[1] is furthest below.
+  before: [Restaurant, Restaurant];
+  after: [Restaurant, Restaurant];
 }
 
 // Mounting this hook is what triggers useLocation's permission prompt (it
@@ -58,9 +61,10 @@ export function useWheel(filters: Filters) {
     if (n === 0) return;
 
     const targetIndex = Math.floor(Math.random() * n);
+    const at = (offset: number) => items[((targetIndex + offset) % n + n) % n];
     const neighbors: ReelNeighbors = {
-      before: items[(targetIndex - 1 + n) % n],
-      after: items[(targetIndex + 1) % n],
+      before: [at(-2), at(-1)],
+      after: [at(1), at(2)],
     };
 
     setReelItems(items);
@@ -80,6 +84,17 @@ export function useWheel(filters: Filters) {
     setResultNeighbors(null);
   }, []);
 
+  // For starting a genuinely fresh search (e.g. after changing filters and
+  // resubmitting) — unlike reset(), this also drops the cached restaurant
+  // list so stale results can't briefly (or permanently, if a caller forgot
+  // to re-trigger loadRestaurants) be mistaken for the new search's results.
+  const clearResults = useCallback(() => {
+    setRestaurants([]);
+    setWinner(null);
+    setResultNeighbors(null);
+    setSearchError(null);
+  }, []);
+
   return {
     restaurants,
     isLoading,
@@ -91,6 +106,7 @@ export function useWheel(filters: Filters) {
     loadRestaurants,
     landOnReel,
     reset,
+    clearResults,
     locationStatus: location.status,
   };
 }

@@ -1,10 +1,12 @@
 import { CuisineId, CuisineOption } from '../types';
 
+// "Any" leads (it's both the wildcard/no-preference option and the actual
+// default filter value); the specific cuisines follow alphabetically.
 export const CUISINE_OPTIONS: CuisineOption[] = [
-  { id: 'malay', label: 'Malay' },
+  { id: 'any', label: 'Any' },
   { id: 'chinese', label: 'Chinese' },
   { id: 'indian', label: 'Indian' },
-  { id: 'any', label: 'Any' },
+  { id: 'malay', label: 'Malay' },
 ];
 
 /**

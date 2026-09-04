@@ -98,6 +98,14 @@ export const componentTokens = {
   wheel: {
     diameterCompact: 96,
     colorCycle: [colors.primary, colors.accent, colors.highlight],
+    // Fixed rather than tied to few/some/lots — purely decorative, and 8
+    // wedges with a 3-color cycle never repeats evenly per rotation (8 isn't
+    // a multiple of 3), giving a livelier pattern than 4 or 6.
+    segmentCount: 8 as const,
   },
-  sizeCaps: { few: 4, some: 6, lots: 8 } as Record<'few' | 'some' | 'lots', number>,
+  // Higher than the design's original 4/6/8 — those were sized for a
+  // pie-slice wheel's per-slice legibility limit, which doesn't apply to
+  // the reel mechanic (fixed-height rows regardless of pool size). A
+  // bigger pool also means more variety scrolling past during the spin.
+  sizeCaps: { few: 6, some: 10, lots: 15 } as Record<'few' | 'some' | 'lots', number>,
 } as const;
