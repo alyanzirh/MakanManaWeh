@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, SafeAreaView, StatusBar, StyleSheet, View } from 'react-native';
+import * as Location from 'expo-location';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts, Fredoka_600SemiBold, Fredoka_700Bold } from '@expo-google-fonts/fredoka';
 import { Quicksand_500Medium, Quicksand_600SemiBold, Quicksand_700Bold } from '@expo-google-fonts/quicksand';
@@ -155,8 +156,32 @@ function SearchFlow({ filters, setFilters, setCuisine, initialScreen }: SearchFl
 function MainFlow() {
   const { filters, setFilters, setCuisine } = useFilters();
   const [wheelActive, setWheelActive] = useState(false);
-  const [preActiveScreen, setPreActiveScreen] = useState<'permission' | 'setup'>('permission');
+  const [preActiveScreen, setPreActiveScreen] = useState<'checking' | 'permission' | 'setup'>('checking');
   const [initialActiveScreen, setInitialActiveScreen] = useState<ActiveScreen>('setup');
+
+  // getForegroundPermissionsAsync only reads the current status — unlike
+  // useLocation's requestForegroundPermissionsAsync, it never shows the OS
+  // dialog — so this lets returning users (who already granted location
+  // last time) skip straight past Permission instead of seeing it again.
+  useEffect(() => {
+    let cancelled = false;
+    Location.getForegroundPermissionsAsync()
+      .then(({ status }) => {
+        if (cancelled) return;
+        if (status === 'granted') {
+          setInitialActiveScreen('setup');
+          setWheelActive(true);
+        } else {
+          setPreActiveScreen('permission');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPreActiveScreen('permission');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleAllow = useCallback(() => {
     setInitialActiveScreen('permission-pending');
@@ -173,6 +198,13 @@ function MainFlow() {
   }, []);
 
   if (!wheelActive) {
+    if (preActiveScreen === 'checking') {
+      return (
+        <View style={styles.pendingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      );
+    }
     if (preActiveScreen === 'permission') {
       return <PermissionScreen onAllow={handleAllow} onSkip={handleSkipPermission} />;
     }
