@@ -4,7 +4,7 @@
     "slug": "MakanManaWeh",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.yourname.makanmanaweh",
+      "bundleIdentifier": "com.anmsarchives.makanmanaweh",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We use your location to find restaurants near you."
       }
@@ -25,7 +25,8 @@
         "backgroundColor": "#F4F2E7"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anmsarchives.makanmanaweh"
     },
     "web": {
       "favicon": "./assets/favicon.png"
