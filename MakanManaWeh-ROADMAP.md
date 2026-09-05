@@ -13,32 +13,42 @@ free, keyless OpenStreetMap Overpass API for restaurant data.
 - [x] Project scaffolded (`create-expo-app`), dependencies installed
 - [x] Renamed and rebranded to MakanManaWeh throughout
 - [x] Claude Code connected to the project folder via Claude Desktop
-- [ ] First clean run confirmed in Expo Go (no build errors)
-- [ ] App icon + splash screen
+- [x] First clean run confirmed in Expo Go (no build errors)
+- [x] App icon + splash screen
 - [ ] Apple Developer Program enrollment ($99/yr — required before TestFlight/App Store)
 
 ## Phase 1 — Design
 *Where: chat with Claude*
 
-- [ ] Finalize visual style (colors, typography, wheel look) — currently
-      functional but default/unstyled
-- [ ] Sketch onboarding / first-launch flow (location permission priming
+- [x] Finalize visual style (colors, typography, wheel look) — design tokens
+      in `src/theme/theme.ts`, Fredoka/Quicksand type, mascot-based icon set
+- [x] Sketch onboarding / first-launch flow (location permission priming
       screen before the OS prompt, so users understand why you're asking)
-- [ ] Decide on app icon concept and name-in-App-Store
+- [x] Decide on app icon concept and name-in-App-Store — mascot icon
+      (`src/components/Mascot.tsx`), cropped tight on cream rounded-square
 
 ## Phase 2 — Build
 *Where: Claude Code, in the MakanManaWeh folder*
 
-- [ ] Confirm the app runs cleanly end-to-end in Expo Go
-- [ ] Handle edge cases: zero results, Overpass API down (both mirrors),
-      location permission denied, no internet
-- [ ] Polish wheel label overlap for 12+ restaurants
-- [ ] Add app icon / splash screen assets
-- [ ] (Optional) Favorites / recently-picked history
-- [ ] (Optional) Dark mode support
+- [x] Confirm the app runs cleanly end-to-end in Expo Go — all 7 screens +
+      PermissionDeniedScreen built and reviewed live in Expo Go, screen by screen
+- [x] Handle edge cases: zero results (EmptyScreen), Overpass API down
+      (both mirrors tried in `restaurantSearch.ts`), location permission
+      denied (PermissionDeniedScreen, auto-detects when granted later)
+- [x] Polish wheel label overlap for 12+ restaurants — resolved by swapping
+      the pie wheel for a reel mechanic (`DecorativeWheel`/`Reel`), which has
+      no per-slice legibility limit; wheelSize caps raised to 6/10/15
+- [x] Add app icon / splash screen assets — mascot-based icon, adaptive
+      icon, splash, and favicon all replaced from Expo defaults
 
 ## Phase 3 — Test
 *Where: your phone (Expo Go), Claude Code for build errors*
+
+> Note: Expo Go shows its own "Experience needs permission" relay prompt on
+> top of the real OS permission dialog. If a permission check keeps reading
+> `denied` even after Settings is correctly set, check whether Expo Go's own
+> relay prompt was also approved — this layer doesn't exist in a standalone/
+> EAS build, so it's a testing-only artifact.
 
 - [ ] Manual pass through every filter combination
 - [ ] Test in an actual dense city area vs. a sparse suburb — OSM coverage
@@ -64,3 +74,19 @@ free, keyless OpenStreetMap Overpass API for restaurant data.
 - [ ] Use `eas update` for JS-only fixes — ships over-the-air, no new App
       Store review needed
 - [ ] Revisit this roadmap, add the next batch of features
+
+## Future Enhancements
+
+Not scheduled to a phase yet — ideas to pull in during Phase 5 review.
+
+- [ ] Favorites / recently-picked history
+- [ ] Dark mode support — currently light-only
+      (`userInterfaceStyle: "light"` in app.json)
+- [ ] **"Pick your N" swap/review screen** — designed (Turn 9 concept,
+      `MakanManaWeh-design/handoff-to-cc/project/MakanManaWeh Concepts.dc.html`)
+      but not wired into the app. Only triggers when the search returns more
+      restaurants than the wheel-size cap (e.g. 15 found, "some" caps at 10)
+      — lets the user swap which ones land on the wheel before spinning,
+      via a checklist UI (icon circle, name, cuisine · distance, live
+      count like "8 / 8"). See `turn13-final-screens.png` in the design
+      folder for how it fits alongside the 7 shipped screens.
