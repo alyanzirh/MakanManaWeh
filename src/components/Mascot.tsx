@@ -130,10 +130,7 @@ export function Mascot({ variant = 'default', size = 110, animated = true }: Pro
               strokeWidth={3}
               fill="none"
               strokeLinecap="round"
-              transform={steamValues[i].interpolate({
-                inputRange: [0, 1],
-                outputRange: ['translate(0,0)', 'translate(0,-5)'],
-              })}
+              transform={[{ translateY: steamValues[i].interpolate({ inputRange: [0, 1], outputRange: [0, -5] }) }]}
               opacity={steamValues[i].interpolate({ inputRange: [0, 1], outputRange: [0.5, 0.22] })}
             />
           ))
