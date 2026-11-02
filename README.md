@@ -7,7 +7,7 @@ A decision-wheel app for picking a nearby restaurant when you can't decide where
 1. **Onboarding** — quick intro to what the app does.
 2. **Location permission** — asked with context up front, before the OS prompt.
 3. **Setup** — pick a search radius, wheel size (number of restaurants), and cuisine filter.
-4. **Search** — nearby restaurants are pulled from OpenStreetMap (via the free, keyless Overpass API) within your filters.
+4. **Search** — nearby restaurants are pulled from the Google Places API (New) within your filters.
 5. **Spin** — restaurants land on a spinning wheel/reel.
 6. **Result** — see the winner, open it in Maps, spin again, or adjust your filters.
 
@@ -17,11 +17,25 @@ Edge cases are handled explicitly: zero results for the current filters, locatio
 
 - [Expo](https://docs.expo.dev/versions/v54.0.0/) / React Native (~54), TypeScript
 - [Expo Location](https://docs.expo.dev/versions/v54.0.0/sdk/location/) for foreground location
-- [OpenStreetMap Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API) for restaurant data — no API key required
+- [Google Places API (New)](https://developers.google.com/maps/documentation/places/web-service/nearby-search) (Nearby Search) for restaurant data — needs an API key, see below
 - `react-native-svg` for the wheel graphics, `expo-linear-gradient` for the visual polish
 - Fredoka / Quicksand via `@expo-google-fonts`
 
 ## Getting started
+
+Restaurant search needs a Google Places API key. Copy `.env.example` to `.env` and fill it in:
+
+```
+EXPO_PUBLIC_GOOGLE_PLACES_API_KEY=your-key-here
+```
+
+Create the key in a Google Cloud project with billing enabled and **Places API (New)** turned on. Restrict it to that API (and to the Android app's package name + signing SHA-1 if you ship Android), and set a daily quota and a budget alert. Anything prefixed `EXPO_PUBLIC_` is bundled into the app, so never reuse this key elsewhere.
+
+For EAS cloud builds, `.env` is not uploaded — add the same variable to the build environment:
+
+```bash
+eas env:create --name EXPO_PUBLIC_GOOGLE_PLACES_API_KEY --environment preview --visibility sensitive
+```
 
 ```bash
 npm install
@@ -43,7 +57,7 @@ App.tsx                   # screen-state machine driving the whole flow
 src/screens/               # one component per screen (Onboarding, Setup, Spin, Result, …)
 src/components/            # DecorativeWheel, Reel, Mascot, FadeIn transition
 src/hooks/                 # useFilters, useLocation, useWheel
-src/services/               # Overpass API restaurant search
+src/services/               # Google Places restaurant search
 src/theme/                  # colors, typography, component tokens
 ```
 

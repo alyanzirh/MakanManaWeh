@@ -2,14 +2,15 @@
 
 A decision-wheel app for picking a nearby restaurant: filter by search radius,
 wheel size, and cuisine, then spin. Built with Expo/React Native, using the
-free, keyless OpenStreetMap Overpass API for restaurant data.
+Google Places API (New) for restaurant data.
 
 ## Current status (as of this doc)
 
 - [x] Feature set defined: radius / cuisine / restaurant-count filters + spin wheel
 - [x] Core screens built: main wheel screen, filter sheet, result card
 - [x] Rewritten from native SwiftUI to Expo/React Native (Windows-only dev, no Mac)
-- [x] Restaurant search via Overpass API, no API key required
+- [x] Restaurant search via Google Places API (New) — switched from Overpass
+      (free public servers were overloaded/unreachable); needs an API key
 - [x] Project scaffolded (`create-expo-app`), dependencies installed
 - [x] Renamed and rebranded to MakanManaWeh throughout
 - [x] Claude Code connected to the project folder via Claude Desktop
@@ -32,9 +33,13 @@ free, keyless OpenStreetMap Overpass API for restaurant data.
 
 - [x] Confirm the app runs cleanly end-to-end in Expo Go — all 7 screens +
       PermissionDeniedScreen built and reviewed live in Expo Go, screen by screen
-- [x] Handle edge cases: zero results (EmptyScreen), Overpass API down
-      (both mirrors tried in `restaurantSearch.ts`), location permission
+- [x] Handle edge cases: zero results (EmptyScreen), search service down or
+      slow (15 s request timeout in `restaurantSearch.ts`), location permission
       denied (PermissionDeniedScreen, auto-detects when granted later)
+- [ ] Location lookup timeout (kept in view): `getCurrentPositionAsync` in
+      `useLocation.ts` has no time limit, so with no GPS fix the Loading
+      screen can wait forever. Plan: ~12 s timeout, fall back to last known
+      position, otherwise `error` status → retry screen
 - [x] Polish wheel label overlap for 12+ restaurants — resolved by swapping
       the pie wheel for a reel mechanic (`DecorativeWheel`/`Reel`), which has
       no per-slice legibility limit; wheelSize caps raised to 6/10/15
@@ -51,11 +56,11 @@ free, keyless OpenStreetMap Overpass API for restaurant data.
 > EAS build, so it's a testing-only artifact.
 
 - [ ] Manual pass through every filter combination
-- [ ] Test in an actual dense city area vs. a sparse suburb — OSM coverage
-      varies a lot by region
+- [ ] Test in an actual dense city area vs. a sparse suburb — place coverage
+      and cuisine labels vary by region
 - [ ] Test with location permission denied, and with it revoked mid-use
 - [ ] (Optional) Add Jest unit tests for pure logic (haversine distance,
-      cuisine tag matching) — `jest-expo` is the standard setup
+      cuisine place-type mapping) — `jest-expo` is the standard setup
 
 ## Phase 4 — Deploy
 *Where: terminal / Claude Code, App Store Connect*
