@@ -1,13 +1,22 @@
-import { CUISINE_OSM_PATTERN } from '../constants/cuisines';
+import { Platform } from 'react-native';
+import { CUISINE_PLACE_TYPES } from '../constants/cuisines';
 import { CuisineId, Restaurant } from '../types';
 
-// Public, free, keyless Overpass API mirrors. We try them in order in case
-// one is temporarily overloaded — this is a shared community service, not a
-// dedicated backend, so occasional slowness or downtime is expected.
-const OVERPASS_ENDPOINTS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-];
+const PLACES_NEARBY_URL = 'https://places.googleapis.com/v1/places:searchNearby';
+const REQUEST_TIMEOUT_MS = 15000;
+// Nearby Search returns at most 20 places per request, and the radius at most 50 km.
+const MAX_RESULTS_PER_REQUEST = 20;
+const MAX_RADIUS_METERS = 50000;
+
+// Only Pro-tier fields (id, name, address, location, type label) — adding
+// rating/opening hours/price level would bump the request into the pricier
+// Enterprise SKU, which has a much smaller free monthly allowance.
+const FIELD_MASK = 'places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName';
+
+// The API key is restricted to this Android app, so Android requests must say
+// which app they come from (iOS/other requests are not restricted).
+const ANDROID_PACKAGE = 'com.anmsarchives.makanmanaweh';
+const ANDROID_CERT_SHA1 = '7B3C2C21B9C20EBAB5274D28B2BDAC07D1AC489C';
 
 interface SearchParams {
   latitude: number;
@@ -15,6 +24,16 @@ interface SearchParams {
   radiusKm: number;
   cuisines: CuisineId[];
   maxResults: number;
+}
+
+interface PlacesResponse {
+  places?: {
+    id?: string;
+    displayName?: { text?: string };
+    formattedAddress?: string;
+    location?: { latitude?: number; longitude?: number };
+    primaryTypeDisplayName?: { text?: string };
+  }[];
 }
 
 export class RestaurantSearchError extends Error {}
@@ -29,86 +48,94 @@ function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number)
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-function buildQuery({ latitude, longitude, radiusKm, cuisines }: SearchParams): string {
-  const radiusMeters = Math.round(radiusKm * 1000);
-  const around = `(around:${radiusMeters},${latitude},${longitude})`;
-  const cuisineList = cuisines.length === 0 || cuisines.includes('any') ? (['any'] as CuisineId[]) : cuisines;
-
-  const clauses = cuisineList.map((cuisine) => {
-    const pattern = CUISINE_OSM_PATTERN[cuisine];
-    if (!pattern) {
-      // 'any', or a cuisine without a clean OSM tag: match any restaurant/cafe/fast food.
-      return `node["amenity"~"restaurant|cafe|fast_food"]${around};`;
-    }
-    return `node["amenity"~"restaurant|cafe|fast_food"]["cuisine"~"${pattern}",i]${around};`;
-  });
-
-  return `[out:json][timeout:25];(${clauses.join('\n')});out body;`;
+function placeTypesFor(cuisines: CuisineId[]): string[] {
+  const ids = cuisines.length === 0 || cuisines.includes('any') ? (['any'] as CuisineId[]) : cuisines;
+  return Array.from(new Set(ids.flatMap((id) => CUISINE_PLACE_TYPES[id])));
 }
 
 export async function searchRestaurants(params: SearchParams): Promise<Restaurant[]> {
-  const query = buildQuery(params);
-  let lastError: unknown;
-
-  for (const endpoint of OVERPASS_ENDPOINTS) {
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `data=${encodeURIComponent(query)}`,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Overpass returned status ${response.status}`);
-      }
-
-      const json = await response.json();
-      const elements: any[] = json.elements ?? [];
-
-      const seen = new Set<string>();
-      const results: Restaurant[] = [];
-
-      for (const el of elements) {
-        const name = el.tags?.name;
-        if (!name || typeof el.lat !== 'number' || typeof el.lon !== 'number') continue;
-
-        const id = `${el.type}/${el.id}`;
-        if (seen.has(id)) continue;
-        seen.add(id);
-
-        const distanceMeters = haversineMeters(params.latitude, params.longitude, el.lat, el.lon);
-        const address = [el.tags?.['addr:housenumber'], el.tags?.['addr:street']]
-          .filter(Boolean)
-          .join(' ');
-
-        results.push({
-          id,
-          name,
-          category: el.tags?.cuisine ?? el.tags?.amenity,
-          latitude: el.lat,
-          longitude: el.lon,
-          address: address || undefined,
-          distanceMeters,
-        });
-      }
-
-      results.sort((a, b) => a.distanceMeters - b.distanceMeters);
-
-      if (results.length === 0) {
-        throw new RestaurantSearchError(
-          'No restaurants found nearby. Try a bigger radius or a different cuisine.'
-        );
-      }
-
-      return results.slice(0, params.maxResults);
-    } catch (error) {
-      lastError = error;
-      if (error instanceof RestaurantSearchError) throw error;
-      // Network or server error — fall through and try the next mirror.
-    }
+  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+  if (!apiKey) {
+    throw new RestaurantSearchError('The restaurant search is not configured (missing API key).');
   }
 
-  throw new RestaurantSearchError(
-    lastError instanceof Error ? lastError.message : 'Could not reach the restaurant search service.'
-  );
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Goog-Api-Key': apiKey,
+    'X-Goog-FieldMask': FIELD_MASK,
+  };
+  if (Platform.OS === 'android') {
+    headers['X-Android-Package'] = ANDROID_PACKAGE;
+    headers['X-Android-Cert'] = ANDROID_CERT_SHA1;
+  }
+
+  const body = {
+    includedTypes: placeTypesFor(params.cuisines),
+    maxResultCount: Math.min(params.maxResults, MAX_RESULTS_PER_REQUEST),
+    rankPreference: 'DISTANCE',
+    locationRestriction: {
+      circle: {
+        center: { latitude: params.latitude, longitude: params.longitude },
+        radius: Math.min(params.radiusKm * 1000, MAX_RADIUS_METERS),
+      },
+    },
+  };
+
+  // A request that never answers would leave the Loading screen spinning
+  // forever, so give up after a fixed time and surface it as an error.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(PLACES_NEARBY_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    throw new RestaurantSearchError(
+      controller.signal.aborted
+        ? 'The restaurant search timed out. Check your connection and try again.'
+        : 'Could not reach the restaurant search service. Check your connection and try again.'
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    throw new RestaurantSearchError(
+      response.status === 429
+        ? 'The restaurant search is busy right now. Please try again in a bit.'
+        : `The restaurant search failed (status ${response.status}).`
+    );
+  }
+
+  const json: PlacesResponse = await response.json();
+
+  const results: Restaurant[] = [];
+  for (const place of json.places ?? []) {
+    const name = place.displayName?.text;
+    const lat = place.location?.latitude;
+    const lon = place.location?.longitude;
+    if (!place.id || !name || typeof lat !== 'number' || typeof lon !== 'number') continue;
+
+    results.push({
+      id: place.id,
+      name,
+      category: place.primaryTypeDisplayName?.text,
+      latitude: lat,
+      longitude: lon,
+      address: place.formattedAddress || undefined,
+      distanceMeters: haversineMeters(params.latitude, params.longitude, lat, lon),
+    });
+  }
+
+  if (results.length === 0) {
+    throw new RestaurantSearchError('No restaurants found nearby. Try a bigger radius or a different cuisine.');
+  }
+
+  results.sort((a, b) => a.distanceMeters - b.distanceMeters);
+  return results.slice(0, params.maxResults);
 }

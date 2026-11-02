@@ -21,14 +21,3 @@ export const CUISINE_PLACE_TYPES: Record<CuisineId, string[]> = {
   indian: ['indian_restaurant', 'north_indian_restaurant', 'south_indian_restaurant'],
   malay: ['malaysian_restaurant'],
 };
-
-/**
- * Best-effort mapping to OpenStreetMap's freeform `cuisine` tag values.
- * OSM has no formal cuisine taxonomy, so these are regex-style alternations
- * matched case-insensitively — a reasonable approximation, not a guarantee.
- */
-export const CUISINE_OSM_PATTERN: Partial<Record<CuisineId, string>> = {
-  chinese: 'chinese|dim_sum|cantonese',
-  indian: 'indian',
-  malay: 'malaysian|malay',
-};
