@@ -154,6 +154,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1.5,
     borderColor: colors.primary,
+    backgroundColor: colors.cream,
     zIndex: 2,
     ...shadow.card,
   },
