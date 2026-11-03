@@ -8,10 +8,20 @@ const REQUEST_TIMEOUT_MS = 15000;
 const MAX_RESULTS_PER_REQUEST = 20;
 const MAX_RADIUS_METERS = 50000;
 
-// Only Pro-tier fields (id, name, address, location, type label) — adding
-// rating/opening hours/price level would bump the request into the pricier
-// Enterprise SKU, which has a much smaller free monthly allowance.
-const FIELD_MASK = 'places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName';
+// Only Pro-tier fields (id, name, address, location, type label, business
+// status) — adding rating/opening hours/price level would bump the request
+// into the pricier Enterprise SKU, which has a much smaller free monthly allowance.
+const FIELD_MASK =
+  'places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.businessStatus';
+
+type BusinessStatus = 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' | 'BUSINESS_STATUS_UNSPECIFIED';
+
+// Decides whether a place should be offered at all, based on what Google
+// reports about it. Places closed for good or for now ruin the whole point of
+// the suggestion, so they must never reach the reel.
+function isSuggestable(status: BusinessStatus | undefined): boolean {
+  return status === 'OPERATIONAL';
+}
 
 // The API key is restricted to this Android app, so Android requests must say
 // which app they come from (iOS/other requests are not restricted).
@@ -33,6 +43,7 @@ interface PlacesResponse {
     formattedAddress?: string;
     location?: { latitude?: number; longitude?: number };
     primaryTypeDisplayName?: { text?: string };
+    businessStatus?: BusinessStatus;
   }[];
 }
 
@@ -120,6 +131,7 @@ export async function searchRestaurants(params: SearchParams): Promise<Restauran
     const lat = place.location?.latitude;
     const lon = place.location?.longitude;
     if (!place.id || !name || typeof lat !== 'number' || typeof lon !== 'number') continue;
+    if (!isSuggestable(place.businessStatus)) continue;
 
     results.push({
       id: place.id,
