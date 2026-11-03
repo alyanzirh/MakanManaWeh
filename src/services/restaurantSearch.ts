@@ -8,19 +8,23 @@ const REQUEST_TIMEOUT_MS = 15000;
 const MAX_RESULTS_PER_REQUEST = 20;
 const MAX_RADIUS_METERS = 50000;
 
-// Only Pro-tier fields (id, name, address, location, type label, business
-// status) — adding rating/opening hours/price level would bump the request
-// into the pricier Enterprise SKU, which has a much smaller free monthly allowance.
+// currentOpeningHours.openNow makes every request bill as the Enterprise SKU
+// (1,000 free/month vs Pro's 5,000), which is the price of never suggesting a
+// place that is shut right now. Only that one sub-field is requested, not the
+// full weekly schedule. Keep a daily quota on the key so overage can't run up.
 const FIELD_MASK =
-  'places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,places.businessStatus';
+  'places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName,' +
+  'places.businessStatus,places.currentOpeningHours.openNow';
 
 type BusinessStatus = 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' | 'BUSINESS_STATUS_UNSPECIFIED';
 
 // Decides whether a place should be offered at all, based on what Google
-// reports about it. Places closed for good or for now ruin the whole point of
-// the suggestion, so they must never reach the reel.
-function isSuggestable(status: BusinessStatus | undefined): boolean {
-  return status === 'OPERATIONAL';
+// reports about it. Places closed for good, for now, or at this hour ruin the
+// whole point of the suggestion, so they must never reach the reel.
+// openNow is undefined when Google has no opening hours listed for the place.
+function isSuggestable(status: BusinessStatus | undefined, openNow: boolean | undefined): boolean {
+  if (status !== 'OPERATIONAL') return false;
+  return openNow !== false;
 }
 
 // The API key is restricted to this Android app, so Android requests must say
@@ -44,6 +48,7 @@ interface PlacesResponse {
     location?: { latitude?: number; longitude?: number };
     primaryTypeDisplayName?: { text?: string };
     businessStatus?: BusinessStatus;
+    currentOpeningHours?: { openNow?: boolean };
   }[];
 }
 
@@ -131,7 +136,7 @@ export async function searchRestaurants(params: SearchParams): Promise<Restauran
     const lat = place.location?.latitude;
     const lon = place.location?.longitude;
     if (!place.id || !name || typeof lat !== 'number' || typeof lon !== 'number') continue;
-    if (!isSuggestable(place.businessStatus)) continue;
+    if (!isSuggestable(place.businessStatus, place.currentOpeningHours?.openNow)) continue;
 
     results.push({
       id: place.id,
