@@ -154,9 +154,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1.5,
     borderColor: colors.primary,
-    backgroundColor: colors.cream,
     zIndex: 2,
     ...shadow.card,
+    // Android paints elevation shadows inside a view with no background (grey fill), and this window must stay see-through.
+    elevation: 0,
   },
   neighborStack: { position: 'absolute', top: 0, left: 0, right: 0 },
   row: { height: ROW_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10 },
